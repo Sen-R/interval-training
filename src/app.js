@@ -14,7 +14,6 @@ const INVERSION_LABEL = ["", " (1st inv)", " (2nd inv)", " (3rd inv)"];
 
 const engine = new AudioEngine();
 
-// Populate the sound picker.
 const voiceSelect = document.getElementById("voice");
 for (const v of VOICES) {
   const opt = document.createElement("option");
@@ -22,6 +21,8 @@ for (const v of VOICES) {
   opt.textContent = v.label;
   voiceSelect.appendChild(opt);
 }
+
+const questionCountSelect = document.getElementById("question-count");
 
 // ---- Build the question list for a session -------------------------------
 
@@ -35,7 +36,7 @@ function drawRoot(center, spread, lo, hi) {
   return clamp(Math.round(randNormal(center, spread)), lo, hi);
 }
 
-function pickItems() {
+function pickItems(n) {
   const counts = Object.keys(SETTINGS.countWeights).map(Number);
   for (const c of counts) {
     if (!LIBRARY[c] || LIBRARY[c].length === 0)
@@ -47,7 +48,7 @@ function pickItems() {
   const hi = noteNameToMidi(SETTINGS.rootHigh);
 
   const questions = [];
-  for (let i = 0; i < SETTINGS.questionsPerSession; i++) {
+  for (let i = 0; i < n; i++) {
     // Layer 1: how many notes.
     const count = weightedChoice(counts, (c) => SETTINGS.countWeights[c]);
     // Layer 2: which pattern of that size.
@@ -110,7 +111,8 @@ document.getElementById("start-btn").addEventListener("click", async (e) => {
   await engine.resume(voiceSelect.value);
   startBtn.disabled = false;
   startBtn.textContent = "Start practice";
-  state.questions = pickItems();
+  const n = parseInt(questionCountSelect.value, 10);
+  state.questions = pickItems(n);
   state.index = 0;
   state.answers = [];
   show("question");
@@ -231,19 +233,23 @@ el.next.addEventListener("click", () => {
 });
 
 function showSummary() {
+  stopAll();
   const total = state.answers.length;
   const right = state.answers.filter((a) => a.correct).length;
+  const pct   = Math.round(100 * right / total);
   const missed = state.answers.filter((a) => !a.correct);
 
-  let html = `<p class="score">${right} / ${total} correct</p>`;
-  if (missed.length) {
-    html += `<h3>Worth another listen</h3><ul>`;
+  let html = `<p class="score">${right} / ${total}</p>`;
+  html += `<p class="score-pct">${pct}% correct</p>`;
+
+  if (missed.length === 0) {
+    html += `<p class="perfect">Perfect score!</p>`;
+  } else {
+    html += `<h3>Missed</h3><ul>`;
     for (const a of missed) {
-      html += `<li>${a.question.item.name} — you said ${a.chosen}, it was ${a.question.count}</li>`;
+      html += `<li>${a.question.item.name} — you said ${a.chosen}, it had ${a.question.count}</li>`;
     }
     html += `</ul>`;
-  } else {
-    html += `<p>Perfect score! 🎉</p>`;
   }
   el.summaryBody.innerHTML = html;
   show("summary");

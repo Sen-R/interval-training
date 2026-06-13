@@ -16,10 +16,21 @@
         You'll hear a chord played on the piano. Listen, then choose how many
         notes it contained — 2, 3, or 4.
       </p>
-      <label class="voice">
-        Sound:
-        <select id="voice"></select>
-      </label>
+      <div class="start-options">
+        <label class="option-label">
+          Questions:
+          <select id="question-count">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+          </select>
+        </label>
+        <label class="option-label">
+          Sound:
+          <select id="voice"></select>
+        </label>
+      </div>
       <button id="start-btn" class="primary big">Start practice</button>
     </section>
 
