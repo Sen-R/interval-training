@@ -79,8 +79,11 @@ export const SETTINGS = {
   rootHigh: "G4",
 
   // Playback timing.
-  noteSeconds: 2,        // how long the chord rings each time
+  questionPauseSeconds: 0.6, // silence before the chord plays at the start of each question
+  noteSeconds: 3,        // how long the chord rings each time
+  buttonsAvailableSeconds: 2, // answer buttons unlock this many seconds after chord starts
   repeats: 2,            // how many times the chord is played
   gapSeconds: 0.6,       // silence between the repeats
   brokenNoteSeconds: 0.7,// per-note length when played broken (feedback)
+  feedbackPauseSeconds: 1.0, // pause before broken playback so the question chord fades
 };

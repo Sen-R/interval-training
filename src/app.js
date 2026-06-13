@@ -117,28 +117,58 @@ document.getElementById("start-btn").addEventListener("click", async (e) => {
   presentQuestion();
 });
 
+let answered = false;
+let playToken = 0;
+let feedbackToken = 0; // hoisted here so stopAll() can see both tokens
+
+// Single choke point: invalidates all in-flight audio loops and disconnects
+// the audio engine output so already-scheduled notes play into silence.
+function stopAll() {
+  answered = true;
+  playToken++;
+  feedbackToken++;
+  engine.stop();
+}
+
 async function presentQuestion() {
+  stopAll();
   const q = state.questions[state.index];
+  answered = false;
+  const myToken = ++playToken; // re-arm after stopAll() incremented it
   el.progress.textContent = `Question ${state.index + 1} of ${state.questions.length}`;
   el.feedback.innerHTML = "";
   el.feedback.className = "feedback";
   el.next.classList.add("hidden");
+  el.replayChord.classList.add("hidden");
   setChoicesEnabled(false);
-  el.replayChord.disabled = true;
 
-  await playPrompt(q);
+  // Start the chord, unlock buttons after buttonsAvailableSeconds, then wait
+  // for the full chord to finish before starting the gap + repeat.
+  el.status.textContent = listenLabel(1);
+  await sleep(SETTINGS.questionPauseSeconds * 1000);
+  if (myToken !== playToken) return;
+  const chordDone = engine.playChord(q.notes, SETTINGS.noteSeconds);
 
-  el.status.textContent = "How many notes did you hear?";
-  setChoicesEnabled(true);
-  el.replayChord.disabled = false;
+  await sleep(SETTINGS.buttonsAvailableSeconds * 1000);
+  if (!answered && myToken === playToken) setChoicesEnabled(true);
+
+  await chordDone;
+  playRemainingRepeats(q, myToken);
 }
 
-async function playPrompt(q) {
-  for (let r = 0; r < SETTINGS.repeats; r++) {
-    el.status.textContent =
-      SETTINGS.repeats > 1 ? `Listen… (${r + 1}/${SETTINGS.repeats})` : "Listen…";
+function listenLabel(n) {
+  return SETTINGS.repeats > 1 ? `Listen… (${n}/${SETTINGS.repeats})` : "Listen…";
+}
+
+async function playRemainingRepeats(q, myToken) {
+  for (let r = 1; r < SETTINGS.repeats; r++) {
+    await sleep(SETTINGS.gapSeconds * 1000);
+    if (answered || myToken !== playToken) return;
+    el.status.textContent = listenLabel(r + 1);
     await engine.playChord(q.notes, SETTINGS.noteSeconds);
-    if (r < SETTINGS.repeats - 1) await sleep(SETTINGS.gapSeconds * 1000);
+  }
+  if (!answered && myToken === playToken) {
+    el.status.textContent = "How many notes did you hear?";
   }
 }
 
@@ -146,24 +176,38 @@ function setChoicesEnabled(on) {
   for (const btn of el.choices.querySelectorAll("button")) btn.disabled = !on;
 }
 
-el.replayChord.addEventListener("click", async () => {
-  const q = state.questions[state.index];
-  el.replayChord.disabled = true;
-  await engine.playChord(q.notes, SETTINGS.noteSeconds);
-  el.replayChord.disabled = false;
+el.replayChord.addEventListener("click", () => {
+  startFeedbackPlayback(state.questions[state.index]);
 });
+
+async function playFeedbackSequence(q, token) {
+  await sleep(SETTINGS.feedbackPauseSeconds * 1000);
+  if (token !== feedbackToken) return;
+  await engine.playBroken(q.notes, SETTINGS.brokenNoteSeconds);
+  if (token !== feedbackToken) return;
+  await sleep(SETTINGS.gapSeconds * 1000);
+  if (token !== feedbackToken) return;
+  await engine.playChord(q.notes, SETTINGS.noteSeconds);
+}
+
+function startFeedbackPlayback(q) {
+  stopAll();
+  const token = ++feedbackToken; // re-arm after stopAll() incremented it
+  playFeedbackSequence(q, token);
+}
 
 for (const btn of el.choices.querySelectorAll("button")) {
   btn.addEventListener("click", () => onAnswer(parseInt(btn.dataset.count, 10)));
 }
 
-async function onAnswer(chosen) {
+function onAnswer(chosen) {
   const q = state.questions[state.index];
   const correct = chosen === q.count;
   state.answers.push({ question: q, chosen, correct });
 
+  stopAll(); // cancel question repeats and cut any ringing note
+
   setChoicesEnabled(false);
-  el.replayChord.disabled = true;
   el.status.textContent = "";
 
   const names = [...q.notes].sort((a, b) => a - b).map(midiToName).join(" – ");
@@ -172,12 +216,12 @@ async function onAnswer(chosen) {
     <p class="verdict">${correct ? "✓ Correct!" : "✗ Not quite."}</p>
     <p>It had <strong>${q.count}</strong> notes — ${q.item.name}${INVERSION_LABEL[q.inv]}.</p>
     <p class="notes">${names}</p>
-    <p class="hint">Listen to each note in turn…</p>`;
+    <p class="hint">Listen to each note separately, then together…</p>`;
 
-  await engine.playBroken(q.notes, SETTINGS.brokenNoteSeconds);
-
+  el.replayChord.classList.remove("hidden");
   el.replayChord.disabled = false;
   el.next.classList.remove("hidden");
+  startFeedbackPlayback(q);
 }
 
 el.next.addEventListener("click", () => {
