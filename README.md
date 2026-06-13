@@ -9,18 +9,10 @@ No installation needed: it runs in any modern browser, including a Chromebook.
 
 ### Sound
 
-Pick the sound from the **Sound** dropdown on the start screen:
-
-- **Grand piano (recorded)** — the Salamander Grand Piano (real multi-velocity
-  recordings, via Tone.js). Most realistic, including natural decay. Default.
-- **GM piano (soundfont)** — a General-MIDI acoustic-grand soundfont. Lighter,
-  loads faster, a touch more synthetic.
-- **Synth (works offline)** — the built-in Web Audio tone. No network needed.
-
-Samples download from a CDN the first time you press *Start* (hence the brief
-"Loading sound…" pause), then they're cached. If a sampled voice can't load —
-the **offline single file**, or no network — the app automatically falls back
-to the synth, so it always works.
+The piano is the Salamander Grand Piano — real multi-velocity recordings played
+via Tone.js, with natural decay. The samples download from a CDN the first time
+you press *Start* (hence the brief "Loading piano…" pause), then they're cached,
+so an internet connection is needed on first use.
 
 ## Use it
 
@@ -63,29 +55,37 @@ Handy recipes:
 
 ## Run locally (development)
 
-ES modules need to be served over http, so use any static server:
+Edit `src/` and the markup in `dev.html`. ES modules need to be served over
+http, so use any static server and open **`dev.html`** (unbundled — refresh to
+see changes, no build step):
 
 ```bash
 python3 -m http.server 8000
-# then open http://localhost:8000
+# then open http://localhost:8000/dev.html
 ```
 
-## Build the offline single file
+## Build
 
-After editing anything, regenerate the standalone file:
+`index.html` (the deployed homepage) and `dist/interval-training.html` (the
+offline copy) are both **generated** — single self-contained files with the CSS
+and JS inlined. After editing `dev.html` or anything in `src/`, regenerate them:
 
 ```bash
-node build.js      # writes dist/interval-training.html
+node build.js      # writes index.html + dist/interval-training.html
 ```
+
+Inlining is deliberate: serving the app as separate ES modules lets the browser
+cache each file independently, so a deploy can leave fresh HTML running against
+a stale, cached `app.js`. One self-contained file has nothing to cache out of
+sync, so the live site can't get into that mixed-version state.
 
 ## Deploy (GitHub Pages)
 
-1. Push this repo to GitHub.
+1. Run `node build.js`, then commit and push.
 2. Settings → Pages → Source: *Deploy from a branch*, branch `main`, folder `/`.
 3. Share the resulting `https://<you>.github.io/interval-training/` URL.
 
-Updating content later = edit `src/config.js`, commit, push. (Re-run
-`node build.js` too if you also share the offline file.)
+Updating content later = edit `src/config.js`, run `node build.js`, commit, push.
 
 ## Layout
 
@@ -93,8 +93,9 @@ Updating content later = edit `src/config.js`, commit, push. (Re-run
 | --- | --- |
 | `src/config.js` | **The content** — chords + settings. Edit this. |
 | `src/music.js` | Note ↔ MIDI ↔ frequency helpers. |
-| `src/audio.js` | Web Audio synth: play chord / broken chord. |
+| `src/audio.js` | Piano playback: chord / broken chord (Tone.js). |
 | `src/app.js` | Question flow + UI. |
 | `src/styles.css` | Styling. |
-| `index.html` | Page markup. |
-| `build.js` | Bundles everything into `dist/interval-training.html`. |
+| `dev.html` | **Source** page markup. Edit this. |
+| `index.html` | Generated, self-contained homepage. *Don't edit — run `build.js`.* |
+| `build.js` | Inlines everything into `index.html` + `dist/interval-training.html`. |

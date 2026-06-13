@@ -1,4 +1,8 @@
-// Pure music-theory helpers: no DOM, no audio. Easy to reason about and reuse.
+// Pure helpers: no DOM, no audio. Easy to reason about and reuse.
+
+// Resolve after `ms` milliseconds. Shared so the bundle has a single
+// definition (duplicate top-level consts would collide once inlined).
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NAME_TO_SEMITONE = {

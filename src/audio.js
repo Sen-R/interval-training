@@ -1,4 +1,4 @@
-import { midiToName } from "./music.js";
+import { midiToName, sleep } from "./music.js";
 
 const TONE_LIB        = "https://esm.sh/tone@14.7.77";
 const SALAMANDER_BASE = "https://tonejs.github.io/audio/salamander/";
@@ -15,8 +15,6 @@ const SAMPLE_URLS = (() => {
   urls["C8"] = "C8.mp3";
   return urls;
 })();
-
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
 //  PianoEngine

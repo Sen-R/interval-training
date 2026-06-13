@@ -8,6 +8,7 @@ import {
   weightedChoice,
   randNormal,
   invert,
+  sleep,
 } from "./music.js";
 
 const INVERSION_LABEL = ["", " (1st inv)", " (2nd inv)", " (3rd inv)"];
@@ -243,7 +244,3 @@ function showSummary() {
 document.getElementById("again-btn").addEventListener("click", () => {
   show("start");
 });
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}

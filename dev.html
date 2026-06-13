@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!--
+  SOURCE markup (unbundled). Open this for local development:
+      python3 -m http.server 8000   →   http://localhost:8000/dev.html
+  Edit src/ and refresh — no build needed.
+
+  The DEPLOYED homepage is the self-contained `index.html`, generated from
+  this file by `node build.js`. Edit dev.html, never index.html.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chord Counting Practice</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>How many notes?</h1>
+
+    <!-- Start -->
+    <section id="screen-start" class="screen">
+      <p class="lede">
+        You'll hear a chord played on the piano. Listen, then choose how many
+        notes it contained — 2, 3, or 4.
+      </p>
+      <label class="option-label">
+        Questions:
+        <input id="question-count" type="number" min="1" max="100" value="10" />
+      </label>
+      <button id="start-btn" class="primary big">Start practice</button>
+    </section>
+
+    <!-- Question -->
+    <section id="screen-question" class="screen hidden">
+      <p id="progress" class="progress"></p>
+      <p id="status" class="status"></p>
+
+      <div id="choices" class="choices">
+        <button data-count="2" disabled>2</button>
+        <button data-count="3" disabled>3</button>
+        <button data-count="4" disabled>4</button>
+      </div>
+
+      <div id="feedback" class="feedback"></div>
+
+      <div class="controls">
+        <button id="replay-chord" class="secondary" disabled>▶ Replay</button>
+        <button id="next-btn" class="primary hidden">Next →</button>
+      </div>
+    </section>
+
+    <!-- Summary -->
+    <section id="screen-summary" class="screen hidden">
+      <h2>Session complete</h2>
+      <div id="summary-body"></div>
+      <button id="again-btn" class="primary big">Practice again</button>
+    </section>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
