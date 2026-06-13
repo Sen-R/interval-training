@@ -9,13 +9,18 @@ No installation needed: it runs in any modern browser, including a Chromebook.
 
 ### Sound
 
-Online, it loads a real **General-MIDI acoustic-grand-piano soundfont** (the
-same sampled sound MIDI players use). The samples download the first time you
-press *Start*, which is why there's a brief "Loading piano…" pause.
+Pick the sound from the **Sound** dropdown on the start screen:
 
-If the soundfont can't be loaded — e.g. the **offline single file**, or no
-network — it automatically falls back to a built-in synthesised tone so the app
-still works everywhere.
+- **Grand piano (recorded)** — the Salamander Grand Piano (real multi-velocity
+  recordings, via Tone.js). Most realistic, including natural decay. Default.
+- **GM piano (soundfont)** — a General-MIDI acoustic-grand soundfont. Lighter,
+  loads faster, a touch more synthetic.
+- **Synth (works offline)** — the built-in Web Audio tone. No network needed.
+
+Samples download from a CDN the first time you press *Start* (hence the brief
+"Loading sound…" pause), then they're cached. If a sampled voice can't load —
+the **offline single file**, or no network — the app automatically falls back
+to the synth, so it always works.
 
 ## Use it
 

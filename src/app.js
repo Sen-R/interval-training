@@ -1,8 +1,17 @@
 import { LIBRARY, SETTINGS } from "./config.js";
-import { AudioEngine } from "./audio.js";
+import { AudioEngine, VOICES } from "./audio.js";
 import { noteNameToMidi, midiToName, randInt } from "./music.js";
 
 const engine = new AudioEngine();
+
+// Populate the sound picker.
+const voiceSelect = document.getElementById("voice");
+for (const v of VOICES) {
+  const opt = document.createElement("option");
+  opt.value = v.id;
+  opt.textContent = v.label;
+  voiceSelect.appendChild(opt);
+}
 
 // ---- Build the question list for a session -------------------------------
 
@@ -61,8 +70,8 @@ function show(name) {
 document.getElementById("start-btn").addEventListener("click", async (e) => {
   const startBtn = e.currentTarget;
   startBtn.disabled = true;
-  startBtn.textContent = "Loading piano…";
-  await engine.resume();
+  startBtn.textContent = "Loading sound…";
+  await engine.resume(voiceSelect.value);
   startBtn.disabled = false;
   startBtn.textContent = "Start practice";
   state.questions = pickItems();
