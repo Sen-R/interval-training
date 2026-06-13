@@ -58,8 +58,13 @@ function show(name) {
 
 // ---- Flow ----------------------------------------------------------------
 
-document.getElementById("start-btn").addEventListener("click", async () => {
+document.getElementById("start-btn").addEventListener("click", async (e) => {
+  const startBtn = e.currentTarget;
+  startBtn.disabled = true;
+  startBtn.textContent = "Loading piano…";
   await engine.resume();
+  startBtn.disabled = false;
+  startBtn.textContent = "Start practice";
   state.questions = pickItems();
   state.index = 0;
   state.answers = [];

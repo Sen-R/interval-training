@@ -1,11 +1,21 @@
 # Chord Counting Practice
 
 A small web app for practising **how many notes are in a chord** (2, 3, or 4) by
-ear. It plays a chord twice on a synthesised piano, you choose the count, and it
-gives feedback — revealing the answer, playing the chord broken (one note at a
-time), and showing the note names.
+ear. It plays a chord twice on a piano, you choose the count, and it gives
+feedback — revealing the answer, playing the chord broken (one note at a time),
+and showing the note names.
 
 No installation needed: it runs in any modern browser, including a Chromebook.
+
+### Sound
+
+Online, it loads a real **General-MIDI acoustic-grand-piano soundfont** (the
+same sampled sound MIDI players use). The samples download the first time you
+press *Start*, which is why there's a brief "Loading piano…" pause.
+
+If the soundfont can't be loaded — e.g. the **offline single file**, or no
+network — it automatically falls back to a built-in synthesised tone so the app
+still works everywhere.
 
 ## Use it
 

@@ -229,16 +229,27 @@ const SETTINGS = {
 
 // ===== src/audio.js =====
 
-// A small Web Audio synth.  No samples / assets, so the whole app stays
-// self-contained and works offline.  Each note is a few detuned partials with a
-// percussive (piano-ish) decay envelope.
+// URL of the soundfont-player library (loaded lazily, only in the browser).
+const SOUNDFONT_LIB = "https://esm.sh/soundfont-player@0.16.0";
+
+// Audio engine with two backends:
+//   1. A real General-MIDI acoustic-grand-piano soundfont (sampled) — used when
+//      it can be loaded over the network (e.g. on the hosted version).
+//   2. A built-in Web Audio synth fallback — used offline or if the soundfont
+//      fails to load, so the app always works.
 class AudioEngine {
   constructor() {
     this.ctx = null;
     this.master = null;
+    this.instrument = null; // soundfont instrument, or null when using the synth
   }
 
-  // Must be called from a user gesture (Chrome blocks audio otherwise).
+  get usingSamples() {
+    return this.instrument !== null;
+  }
+
+  // Must be called from a user gesture (browsers block audio otherwise).
+  // Also lazily loads the piano soundfont; falls back to the synth on failure.
   async resume() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -247,12 +258,56 @@ class AudioEngine {
       this.master.connect(this.ctx.destination);
     }
     if (this.ctx.state === "suspended") await this.ctx.resume();
+    await this._loadInstrument();
   }
 
-  // Schedule a single note starting at `at`, lasting `dur` seconds.
-  _scheduleNote(midi, at, dur, velocity) {
+  async _loadInstrument() {
+    if (this.instrument) return;
+    try {
+      const mod = await import(SOUNDFONT_LIB);
+      const Soundfont = mod.default || mod;
+      this.instrument = await Soundfont.instrument(
+        this.ctx,
+        "acoustic_grand_piano",
+        { soundfont: "MusyngKite", destination: this.master }
+      );
+    } catch (err) {
+      console.warn("Soundfont unavailable, using synth fallback:", err);
+      this.instrument = null;
+    }
+  }
+
+  // ---- Public playback -----------------------------------------------------
+
+  // Play all notes simultaneously, once. Resolves when finished.
+  playChord(midiNotes, dur) {
+    const when = this.ctx.currentTime + 0.05;
+    const gain = 1 / Math.sqrt(midiNotes.length); // keep chords from clipping
+    for (const m of midiNotes) this._play(m, when, dur, gain);
+    return this._sleep((dur + 0.2) * 1000);
+  }
+
+  // Play notes one after another (broken / arpeggiated), low to high.
+  playBroken(midiNotes, noteDur) {
+    const sorted = [...midiNotes].sort((a, b) => a - b);
+    const when = this.ctx.currentTime + 0.05;
+    sorted.forEach((m, i) => this._play(m, when + i * noteDur, noteDur, 0.85));
+    return this._sleep((sorted.length * noteDur + 0.2) * 1000);
+  }
+
+  // ---- Backend dispatch ----------------------------------------------------
+
+  _play(midi, when, dur, gain) {
+    if (this.instrument) {
+      this.instrument.play(midi, when, { duration: dur, gain });
+    } else {
+      this._synthNote(midi, when, dur, gain * 0.8);
+    }
+  }
+
+  // Fallback synth: a few partials with a percussive (piano-ish) envelope.
+  _synthNote(midi, at, dur, velocity) {
     const freq = midiToFreq(midi);
-    // Relative amplitudes of the partials -> a slightly bright, struck tone.
     const partials = [
       { mult: 1, gain: 1.0 },
       { mult: 2, gain: 0.45 },
@@ -263,13 +318,11 @@ class AudioEngine {
     const noteGain = this.ctx.createGain();
     noteGain.connect(this.master);
 
-    // Percussive envelope: fast attack, exponential-ish decay, short release.
-    const t = at;
     const peak = velocity;
-    noteGain.gain.setValueAtTime(0.0001, t);
-    noteGain.gain.exponentialRampToValueAtTime(peak, t + 0.01);
-    noteGain.gain.exponentialRampToValueAtTime(peak * 0.3, t + dur * 0.6);
-    noteGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    noteGain.gain.setValueAtTime(0.0001, at);
+    noteGain.gain.exponentialRampToValueAtTime(peak, at + 0.01);
+    noteGain.gain.exponentialRampToValueAtTime(peak * 0.3, at + dur * 0.6);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
 
     for (const p of partials) {
       const osc = this.ctx.createOscillator();
@@ -278,28 +331,9 @@ class AudioEngine {
       const g = this.ctx.createGain();
       g.gain.value = p.gain;
       osc.connect(g).connect(noteGain);
-      osc.start(t);
-      osc.stop(t + dur + 0.05);
+      osc.start(at);
+      osc.stop(at + dur + 0.05);
     }
-  }
-
-  // Play all notes simultaneously, once. Returns a promise resolving when done.
-  playChord(midiNotes, dur) {
-    const start = this.ctx.currentTime + 0.05;
-    // Keep summed amplitude in check so 4-note chords don't clip.
-    const velocity = 0.8 / Math.sqrt(midiNotes.length);
-    for (const m of midiNotes) this._scheduleNote(m, start, dur, velocity);
-    return this._sleep((dur + 0.1) * 1000);
-  }
-
-  // Play notes one after another (broken / arpeggiated), low to high.
-  playBroken(midiNotes, noteDur) {
-    const sorted = [...midiNotes].sort((a, b) => a - b);
-    const start = this.ctx.currentTime + 0.05;
-    sorted.forEach((m, i) => {
-      this._scheduleNote(m, start + i * noteDur, noteDur, 0.7);
-    });
-    return this._sleep((sorted.length * noteDur + 0.1) * 1000);
   }
 
   _sleep(ms) {
@@ -368,8 +402,13 @@ function show(name) {
 
 // ---- Flow ----------------------------------------------------------------
 
-document.getElementById("start-btn").addEventListener("click", async () => {
+document.getElementById("start-btn").addEventListener("click", async (e) => {
+  const startBtn = e.currentTarget;
+  startBtn.disabled = true;
+  startBtn.textContent = "Loading piano…";
   await engine.resume();
+  startBtn.disabled = false;
+  startBtn.textContent = "Start practice";
   state.questions = pickItems();
   state.index = 0;
   state.answers = [];
