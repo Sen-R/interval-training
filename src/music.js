@@ -32,3 +32,40 @@ export function midiToFreq(midi) {
 export function randInt(min, max) {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
+
+export function clamp(x, lo, hi) {
+  return Math.max(lo, Math.min(hi, x));
+}
+
+// Pick one item from `items` with probability proportional to weightFn(item).
+export function weightedChoice(items, weightFn) {
+  const total = items.reduce((sum, it) => sum + weightFn(it), 0);
+  let r = Math.random() * total;
+  for (const it of items) {
+    r -= weightFn(it);
+    if (r < 0) return it;
+  }
+  return items[items.length - 1];
+}
+
+// A sample from a normal distribution (Box–Muller). Used to bias the root
+// pitch toward a centre while occasionally straying higher/lower.
+export function randNormal(mean, stdDev) {
+  const u = 1 - Math.random();
+  const v = Math.random();
+  return mean + stdDev * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// Rotate a chord's offsets into its k-th inversion: move the lowest note(s) up
+// an octave, then re-base so the new bottom note is 0. Note count is unchanged.
+//   [0,4,7] --invert 1--> [3,8,12 -> 0,3,8]   (first inversion)
+export function invert(offsets, k) {
+  let res = offsets.slice();
+  for (let n = 0; n < k; n++) {
+    const bottom = res[0];
+    res = res.slice(1).concat(bottom + 12);
+    const base = res[0];
+    res = res.map((o) => o - base);
+  }
+  return res;
+}

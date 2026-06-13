@@ -31,23 +31,35 @@ to the synth, so it always works.
 ## Change what's tested
 
 Everything you'd want to tweak lives in **`src/config.js`** — you don't need to
-touch any other file.
+touch any other file. Selection happens in two independent layers:
 
-- **`LIBRARY`** — the chords/intervals. Each is a list of semitone *offsets* from
-  a root (`0` = root). The note count is just how many offsets there are, so
-  2-, 3- and 4-note items mix automatically. Add a line to add an item.
-- **`SETTINGS`** — timing (`noteSeconds`, `repeats`, `gapSeconds`), how many
-  questions per session, the random root range, and `includeTags`.
+- **`SETTINGS.countWeights`** decides how often a question has **2 / 3 / 4
+  notes** — set directly, e.g. `{ 2: 50, 3: 35, 4: 15 }` for 50% / 35% / 15%.
+  This is independent of how many patterns you list, so it never drifts.
+- **`LIBRARY`** lists the patterns, grouped by note-count. Each has a `name`,
+  semitone `offsets` (above the lowest note, `0` = bottom), and a **`weight`**
+  controlling how common it is *within its group*. Give rare/odd ones `weight:
+  1` so they show up sometimes without taking over; give staples a higher weight.
+
+Other `SETTINGS`:
+
+- **`randomInversions`** — when `true`, triads/7ths are voiced in a random
+  inversion (the note count is unchanged, so the answer isn't affected).
+- **`rootCenter` / `rootSpread` / `rootLow` / `rootHigh`** — the lowest note is
+  drawn around `rootCenter` with a bell-curve `rootSpread` (in semitones), kept
+  within `[rootLow, rootHigh]`. So most chords sit in the middle and occasionally
+  stray higher/lower.
+- **`noteSeconds` / `repeats` / `gapSeconds` / `brokenNoteSeconds`** — timing.
 
 Handy recipes:
 
-- **Drill only 2-note intervals:** set `includeTags: ["interval"]`.
+- **Add a new interval:** add a line to `LIBRARY[2]`, e.g.
+  `{ name: "Minor seventh", offsets: [0, 10], weight: 1 }`.
+- **Make a pattern rarer/commoner:** change its `weight`.
+- **Drill only 2-note intervals:** set `countWeights: { 2: 1 }`.
+- **Shift the 3/4-note balance:** edit the `countWeights` numbers.
 - **Make it slower/easier:** raise `noteSeconds`, or set `repeats: 3`.
-- **Narrow the pitch range:** set `rootLow`/`rootHigh` closer together.
-
-> Note: questions are drawn uniformly across items, so if `LIBRARY` has more
-> 2-note items than 3- or 4-note ones, she'll hear more 2-note chords. Keep the
-> counts of each roughly even if you want an even mix.
+- **Keep it tighter to the middle octave:** lower `rootSpread`.
 
 ## Run locally (development)
 

@@ -1,6 +1,16 @@
 import { LIBRARY, SETTINGS } from "./config.js";
 import { AudioEngine, VOICES } from "./audio.js";
-import { noteNameToMidi, midiToName, randInt } from "./music.js";
+import {
+  noteNameToMidi,
+  midiToName,
+  randInt,
+  clamp,
+  weightedChoice,
+  randNormal,
+  invert,
+} from "./music.js";
+
+const INVERSION_LABEL = ["", " (1st inv)", " (2nd inv)", " (3rd inv)"];
 
 const engine = new AudioEngine();
 
@@ -15,21 +25,47 @@ for (const v of VOICES) {
 
 // ---- Build the question list for a session -------------------------------
 
-function pickItems() {
-  const pool = LIBRARY.filter((item) =>
-    item.tags.some((t) => SETTINGS.includeTags.includes(t))
-  );
-  if (pool.length === 0) throw new Error("No items match includeTags.");
+// Normal draw kept inside [lo, hi] by re-rolling, so the bell curve isn't
+// flattened into a spike at the edges (falls back to clamp after a few tries).
+function drawRoot(center, spread, lo, hi) {
+  for (let t = 0; t < 20; t++) {
+    const r = Math.round(randNormal(center, spread));
+    if (r >= lo && r <= hi) return r;
+  }
+  return clamp(Math.round(randNormal(center, spread)), lo, hi);
+}
 
-  const rootLow = noteNameToMidi(SETTINGS.rootLow);
-  const rootHigh = noteNameToMidi(SETTINGS.rootHigh);
+function pickItems() {
+  const counts = Object.keys(SETTINGS.countWeights).map(Number);
+  for (const c of counts) {
+    if (!LIBRARY[c] || LIBRARY[c].length === 0)
+      throw new Error(`countWeights includes ${c} but LIBRARY[${c}] is empty.`);
+  }
+
+  const center = noteNameToMidi(SETTINGS.rootCenter);
+  const lo = noteNameToMidi(SETTINGS.rootLow);
+  const hi = noteNameToMidi(SETTINGS.rootHigh);
 
   const questions = [];
   for (let i = 0; i < SETTINGS.questionsPerSession; i++) {
-    const item = pool[randInt(0, pool.length - 1)];
-    const root = randInt(rootLow, rootHigh);
-    const notes = item.offsets.map((o) => root + o);
-    questions.push({ item, notes, count: item.offsets.length });
+    // Layer 1: how many notes.
+    const count = weightedChoice(counts, (c) => SETTINGS.countWeights[c]);
+    // Layer 2: which pattern of that size.
+    const item = weightedChoice(LIBRARY[count], (it) => it.weight);
+
+    // Optional inversion (voicing only — count is unchanged).
+    let inv = 0;
+    let offsets = item.offsets;
+    if (SETTINGS.randomInversions && count >= 3) {
+      inv = randInt(0, count - 1);
+      offsets = invert(offsets, inv);
+    }
+
+    // Root biased to the middle of the range (rejection-sampled so the tails
+    // don't pile up on the boundaries).
+    const root = drawRoot(center, SETTINGS.rootSpread, lo, hi);
+    const notes = offsets.map((o) => root + o);
+    questions.push({ item, notes, count, inv });
   }
   return questions;
 }
@@ -134,7 +170,7 @@ async function onAnswer(chosen) {
   el.feedback.className = "feedback " + (correct ? "right" : "wrong");
   el.feedback.innerHTML = `
     <p class="verdict">${correct ? "✓ Correct!" : "✗ Not quite."}</p>
-    <p>It had <strong>${q.count}</strong> notes — ${q.item.name}.</p>
+    <p>It had <strong>${q.count}</strong> notes — ${q.item.name}${INVERSION_LABEL[q.inv]}.</p>
     <p class="notes">${names}</p>
     <p class="hint">Listen to each note in turn…</p>`;
 
