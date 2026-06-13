@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chord Counting Practice</title>
+  <style>
+:root {
+  --bg: #0f1226;
+  --panel: #1b1f3b;
+  --ink: #eef0ff;
+  --muted: #9aa0c8;
+  --accent: #6c7bff;
+  --right: #36c98a;
+  --wrong: #ff6b7a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 0%, #1a1f44, var(--bg));
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.app {
+  width: min(560px, 92vw);
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 32px 28px 36px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+h1 { margin: 0 0 20px; font-size: 1.7rem; }
+h2 { margin: 0 0 16px; }
+
+.lede, .status, .progress { color: var(--muted); }
+.lede { font-size: 1.05rem; line-height: 1.5; margin-bottom: 28px; }
+.progress { font-size: 0.9rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.status { min-height: 1.5em; font-size: 1.15rem; margin: 18px 0; }
+
+.hidden { display: none !important; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  transition: transform 0.06s ease, background 0.15s ease, opacity 0.15s ease;
+}
+button:disabled { opacity: 0.4; cursor: default; }
+button:not(:disabled):active { transform: translateY(1px); }
+
+.primary { background: var(--accent); color: white; padding: 12px 22px; }
+.primary:not(:disabled):hover { background: #8190ff; }
+.secondary { background: #2a2f57; color: var(--ink); padding: 10px 18px; }
+.big { font-size: 1.15rem; padding: 14px 28px; }
+
+.choices {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin: 26px 0;
+}
+.choices button {
+  width: 88px;
+  height: 88px;
+  font-size: 2rem;
+  font-weight: 700;
+  background: #2a2f57;
+  color: var(--ink);
+}
+.choices button:not(:disabled):hover { background: #353c70; }
+
+.controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.feedback { min-height: 1em; margin: 10px 0; line-height: 1.5; }
+.feedback .verdict { font-size: 1.3rem; font-weight: 700; margin: 0 0 6px; }
+.feedback.right .verdict { color: var(--right); }
+.feedback.wrong .verdict { color: var(--wrong); }
+.feedback .notes { font-size: 1.2rem; letter-spacing: 0.05em; }
+.feedback .hint { color: var(--muted); font-size: 0.95rem; }
+
+.score { font-size: 1.6rem; font-weight: 700; margin: 8px 0 18px; }
+#summary-body ul { text-align: left; color: var(--muted); line-height: 1.7; }
+#summary-body h3 { margin-bottom: 6px; }
+
+</style>
+</head>
+<body>
+  <main class="app">
+    <h1>How many notes?</h1>
+
+    <!-- Start -->
+    <section id="screen-start" class="screen">
+      <p class="lede">
+        You'll hear a chord played on the piano. Listen, then choose how many
+        notes it contained — 2, 3, or 4.
+      </p>
+      <button id="start-btn" class="primary big">Start practice</button>
+    </section>
+
+    <!-- Question -->
+    <section id="screen-question" class="screen hidden">
+      <p id="progress" class="progress"></p>
+      <p id="status" class="status"></p>
+
+      <div id="choices" class="choices">
+        <button data-count="2" disabled>2</button>
+        <button data-count="3" disabled>3</button>
+        <button data-count="4" disabled>4</button>
+      </div>
+
+      <div id="feedback" class="feedback"></div>
+
+      <div class="controls">
+        <button id="replay-chord" class="secondary" disabled>▶ Replay chord</button>
+        <button id="next-btn" class="primary hidden">Next →</button>
+      </div>
+    </section>
+
+    <!-- Summary -->
+    <section id="screen-summary" class="screen hidden">
+      <h2>Session complete</h2>
+      <div id="summary-body"></div>
+      <button id="again-btn" class="primary big">Practice again</button>
+    </section>
+  </main>
+
+  <script>
+// ===== src/music.js =====
+// Pure music-theory helpers: no DOM, no audio. Easy to reason about and reuse.
+
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NAME_TO_SEMITONE = {
+  C: 0, "C#": 1, DB: 1, D: 2, "D#": 3, EB: 3, E: 4, F: 5,
+  "F#": 6, GB: 6, G: 7, "G#": 8, AB: 8, A: 9, "A#": 10, BB: 10, B: 11,
+};
+
+// "C4" / "F#3" / "Eb5" -> MIDI number (C4 = 60, middle C).
+function noteNameToMidi(name) {
+  const m = /^([A-Ga-g][#b]?)(-?\d+)$/.exec(name.trim());
+  if (!m) throw new Error(`Bad note name: ${name}`);
+  const letter = m[1].toUpperCase();
+  const octave = parseInt(m[2], 10);
+  const semitone = NAME_TO_SEMITONE[letter];
+  if (semitone === undefined) throw new Error(`Bad note name: ${name}`);
+  return semitone + (octave + 1) * 12;
+}
+
+// MIDI number -> "C4". Uses sharps only (good enough for display).
+function midiToName(midi) {
+  const octave = Math.floor(midi / 12) - 1;
+  return NOTE_NAMES[midi % 12] + octave;
+}
+
+// MIDI number -> frequency in Hz (equal temperament, A4 = 440).
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+// Inclusive random integer in [min, max].
+function randInt(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+
+// ===== src/config.js =====
+// ============================================================================
+//  EDIT THIS FILE to change what is tested.  Nothing else needs to change.
+// ============================================================================
+
+// Each item is defined by semitone OFFSETS from a root note (0 = the root).
+// The number of notes is simply offsets.length, so 2-, 3- and 4-note items are
+// mixed automatically.  A random root is chosen for every question, so the same
+// item is heard at many different pitches.
+//
+//   Reference: 0=root 1=m2 2=M2 3=m3 4=M3 5=P4 6=tritone 7=P5
+//              8=m6 9=M6 10=m7 11=M7 12=octave
+const LIBRARY = [
+  // --- 2 notes (intervals) ---
+  { name: "Major third",     offsets: [0, 4],         tags: ["interval"] },
+  { name: "Perfect fifth",   offsets: [0, 7],         tags: ["interval"] },
+  { name: "Octave",          offsets: [0, 12],        tags: ["interval"] },
+  { name: "Minor third",     offsets: [0, 3],         tags: ["interval"] },
+  { name: "Perfect fourth",  offsets: [0, 5],         tags: ["interval"] },
+
+  // --- 3 notes (triads) ---
+  { name: "Major triad",     offsets: [0, 4, 7],      tags: ["triad"] },
+  { name: "Minor triad",     offsets: [0, 3, 7],      tags: ["triad"] },
+  { name: "Diminished triad",offsets: [0, 3, 6],      tags: ["triad"] },
+
+  // --- 4 notes (seventh chords) ---
+  { name: "Dominant 7th",    offsets: [0, 4, 7, 10],  tags: ["seventh"] },
+  { name: "Major 7th",       offsets: [0, 4, 7, 11],  tags: ["seventh"] },
+  { name: "Minor 7th",       offsets: [0, 3, 7, 10],  tags: ["seventh"] },
+];
+const SETTINGS = {
+  // Random root is drawn (inclusive) between these two notes, each question.
+  rootLow: "C3",
+  rootHigh: "C5",
+
+  // Playback of the chord during the question.
+  noteSeconds: 2,     // how long the chord rings each time
+  repeats: 2,         // how many times the chord is played
+  gapSeconds: 0.6,    // silence between the repeats
+
+  // Broken (arpeggiated) playback during feedback.
+  brokenNoteSeconds: 0.7,
+
+  questionsPerSession: 20,
+
+  // Only items whose tags intersect this list are used.
+  // e.g. ["interval"] to drill 2-note only, or all three to mix.
+  includeTags: ["interval", "triad", "seventh"],
+};
+
+
+// ===== src/audio.js =====
+
+// A small Web Audio synth.  No samples / assets, so the whole app stays
+// self-contained and works offline.  Each note is a few detuned partials with a
+// percussive (piano-ish) decay envelope.
+class AudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.master = null;
+  }
+
+  // Must be called from a user gesture (Chrome blocks audio otherwise).
+  async resume() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.9;
+      this.master.connect(this.ctx.destination);
+    }
+    if (this.ctx.state === "suspended") await this.ctx.resume();
+  }
+
+  // Schedule a single note starting at `at`, lasting `dur` seconds.
+  _scheduleNote(midi, at, dur, velocity) {
+    const freq = midiToFreq(midi);
+    // Relative amplitudes of the partials -> a slightly bright, struck tone.
+    const partials = [
+      { mult: 1, gain: 1.0 },
+      { mult: 2, gain: 0.45 },
+      { mult: 3, gain: 0.22 },
+      { mult: 4, gain: 0.12 },
+    ];
+
+    const noteGain = this.ctx.createGain();
+    noteGain.connect(this.master);
+
+    // Percussive envelope: fast attack, exponential-ish decay, short release.
+    const t = at;
+    const peak = velocity;
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+    noteGain.gain.exponentialRampToValueAtTime(peak * 0.3, t + dur * 0.6);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    for (const p of partials) {
+      const osc = this.ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = freq * p.mult;
+      const g = this.ctx.createGain();
+      g.gain.value = p.gain;
+      osc.connect(g).connect(noteGain);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    }
+  }
+
+  // Play all notes simultaneously, once. Returns a promise resolving when done.
+  playChord(midiNotes, dur) {
+    const start = this.ctx.currentTime + 0.05;
+    // Keep summed amplitude in check so 4-note chords don't clip.
+    const velocity = 0.8 / Math.sqrt(midiNotes.length);
+    for (const m of midiNotes) this._scheduleNote(m, start, dur, velocity);
+    return this._sleep((dur + 0.1) * 1000);
+  }
+
+  // Play notes one after another (broken / arpeggiated), low to high.
+  playBroken(midiNotes, noteDur) {
+    const sorted = [...midiNotes].sort((a, b) => a - b);
+    const start = this.ctx.currentTime + 0.05;
+    sorted.forEach((m, i) => {
+      this._scheduleNote(m, start + i * noteDur, noteDur, 0.7);
+    });
+    return this._sleep((sorted.length * noteDur + 0.1) * 1000);
+  }
+
+  _sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+}
+
+
+// ===== src/app.js =====
+
+
+
+const engine = new AudioEngine();
+
+// ---- Build the question list for a session -------------------------------
+
+function pickItems() {
+  const pool = LIBRARY.filter((item) =>
+    item.tags.some((t) => SETTINGS.includeTags.includes(t))
+  );
+  if (pool.length === 0) throw new Error("No items match includeTags.");
+
+  const rootLow = noteNameToMidi(SETTINGS.rootLow);
+  const rootHigh = noteNameToMidi(SETTINGS.rootHigh);
+
+  const questions = [];
+  for (let i = 0; i < SETTINGS.questionsPerSession; i++) {
+    const item = pool[randInt(0, pool.length - 1)];
+    const root = randInt(rootLow, rootHigh);
+    const notes = item.offsets.map((o) => root + o);
+    questions.push({ item, notes, count: item.offsets.length });
+  }
+  return questions;
+}
+
+// ---- Session state -------------------------------------------------------
+
+const state = {
+  questions: [],
+  index: 0,
+  answers: [], // { question, chosen, correct }
+};
+
+// ---- DOM refs ------------------------------------------------------------
+
+const screens = {
+  start: document.getElementById("screen-start"),
+  question: document.getElementById("screen-question"),
+  summary: document.getElementById("screen-summary"),
+};
+const el = {
+  progress: document.getElementById("progress"),
+  status: document.getElementById("status"),
+  choices: document.getElementById("choices"),
+  replayChord: document.getElementById("replay-chord"),
+  feedback: document.getElementById("feedback"),
+  next: document.getElementById("next-btn"),
+  summaryBody: document.getElementById("summary-body"),
+};
+
+function show(name) {
+  for (const key of Object.keys(screens)) {
+    screens[key].classList.toggle("hidden", key !== name);
+  }
+}
+
+// ---- Flow ----------------------------------------------------------------
+
+document.getElementById("start-btn").addEventListener("click", async () => {
+  await engine.resume();
+  state.questions = pickItems();
+  state.index = 0;
+  state.answers = [];
+  show("question");
+  presentQuestion();
+});
+
+async function presentQuestion() {
+  const q = state.questions[state.index];
+  el.progress.textContent = `Question ${state.index + 1} of ${state.questions.length}`;
+  el.feedback.innerHTML = "";
+  el.feedback.className = "feedback";
+  el.next.classList.add("hidden");
+  setChoicesEnabled(false);
+  el.replayChord.disabled = true;
+
+  await playPrompt(q);
+
+  el.status.textContent = "How many notes did you hear?";
+  setChoicesEnabled(true);
+  el.replayChord.disabled = false;
+}
+
+async function playPrompt(q) {
+  for (let r = 0; r < SETTINGS.repeats; r++) {
+    el.status.textContent =
+      SETTINGS.repeats > 1 ? `Listen… (${r + 1}/${SETTINGS.repeats})` : "Listen…";
+    await engine.playChord(q.notes, SETTINGS.noteSeconds);
+    if (r < SETTINGS.repeats - 1) await sleep(SETTINGS.gapSeconds * 1000);
+  }
+}
+
+function setChoicesEnabled(on) {
+  for (const btn of el.choices.querySelectorAll("button")) btn.disabled = !on;
+}
+
+el.replayChord.addEventListener("click", async () => {
+  const q = state.questions[state.index];
+  el.replayChord.disabled = true;
+  await engine.playChord(q.notes, SETTINGS.noteSeconds);
+  el.replayChord.disabled = false;
+});
+
+for (const btn of el.choices.querySelectorAll("button")) {
+  btn.addEventListener("click", () => onAnswer(parseInt(btn.dataset.count, 10)));
+}
+
+async function onAnswer(chosen) {
+  const q = state.questions[state.index];
+  const correct = chosen === q.count;
+  state.answers.push({ question: q, chosen, correct });
+
+  setChoicesEnabled(false);
+  el.replayChord.disabled = true;
+  el.status.textContent = "";
+
+  const names = [...q.notes].sort((a, b) => a - b).map(midiToName).join(" – ");
+  el.feedback.className = "feedback " + (correct ? "right" : "wrong");
+  el.feedback.innerHTML = `
+    <p class="verdict">${correct ? "✓ Correct!" : "✗ Not quite."}</p>
+    <p>It had <strong>${q.count}</strong> notes — ${q.item.name}.</p>
+    <p class="notes">${names}</p>
+    <p class="hint">Listen to each note in turn…</p>`;
+
+  await engine.playBroken(q.notes, SETTINGS.brokenNoteSeconds);
+
+  el.replayChord.disabled = false;
+  el.next.classList.remove("hidden");
+}
+
+el.next.addEventListener("click", () => {
+  state.index++;
+  if (state.index >= state.questions.length) showSummary();
+  else presentQuestion();
+});
+
+function showSummary() {
+  const total = state.answers.length;
+  const right = state.answers.filter((a) => a.correct).length;
+  const missed = state.answers.filter((a) => !a.correct);
+
+  let html = `<p class="score">${right} / ${total} correct</p>`;
+  if (missed.length) {
+    html += `<h3>Worth another listen</h3><ul>`;
+    for (const a of missed) {
+      html += `<li>${a.question.item.name} — you said ${a.chosen}, it was ${a.question.count}</li>`;
+    }
+    html += `</ul>`;
+  } else {
+    html += `<p>Perfect score! 🎉</p>`;
+  }
+  el.summaryBody.innerHTML = html;
+  show("summary");
+}
+
+document.getElementById("again-btn").addEventListener("click", () => {
+  show("start");
+});
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+</script>
+</body>
+</html>
