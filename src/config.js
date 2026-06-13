@@ -59,8 +59,6 @@ export const LIBRARY = {
 };
 
 export const SETTINGS = {
-  questionsPerSession: 20,
-
   // How often each note-count appears. Only counts listed here are used, and
   // the numbers are relative (these happen to be percentages: 50 / 35 / 15).
   // To drill 2-note only: set this to { 2: 1 }.

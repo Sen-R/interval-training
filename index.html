@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chord Counting Practice</title>
-  <link rel="stylesheet" href="src/styles.css?v=3" />
+  <link rel="stylesheet" href="src/styles.css?v=4" />
 </head>
 <body>
   <main class="app">
@@ -16,16 +16,10 @@
         You'll hear a chord played on the piano. Listen, then choose how many
         notes it contained — 2, 3, or 4.
       </p>
-      <div class="start-options">
-        <label class="option-label">
-          Questions:
-          <input id="question-count" type="number" min="1" max="100" value="10" />
-        </label>
-        <label class="option-label">
-          Sound:
-          <select id="voice"></select>
-        </label>
-      </div>
+      <label class="option-label">
+        Questions:
+        <input id="question-count" type="number" min="1" max="100" value="10" />
+      </label>
       <button id="start-btn" class="primary big">Start practice</button>
     </section>
 

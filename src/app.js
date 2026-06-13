@@ -1,5 +1,5 @@
 import { LIBRARY, SETTINGS } from "./config.js";
-import { AudioEngine, VOICES } from "./audio.js";
+import { PianoEngine } from "./audio.js";
 import {
   noteNameToMidi,
   midiToName,
@@ -12,15 +12,7 @@ import {
 
 const INVERSION_LABEL = ["", " (1st inv)", " (2nd inv)", " (3rd inv)"];
 
-const engine = new AudioEngine();
-
-const voiceSelect = document.getElementById("voice");
-for (const v of VOICES) {
-  const opt = document.createElement("option");
-  opt.value = v.id;
-  opt.textContent = v.label;
-  voiceSelect.appendChild(opt);
-}
+const engine = new PianoEngine();
 
 const questionCountSelect = document.getElementById("question-count");
 
@@ -107,8 +99,8 @@ function show(name) {
 document.getElementById("start-btn").addEventListener("click", async (e) => {
   const startBtn = e.currentTarget;
   startBtn.disabled = true;
-  startBtn.textContent = "Loading sound…";
-  await engine.resume(voiceSelect.value);
+  startBtn.textContent = "Loading piano…";
+  await engine.init();
   startBtn.disabled = false;
   startBtn.textContent = "Start practice";
   const n = Math.max(1, parseInt(questionCountSelect.value, 10) || 10);
@@ -134,6 +126,7 @@ function stopAll() {
 
 async function presentQuestion() {
   stopAll();
+  await engine.reset(); // fresh sampler — notes from the previous question are gone
   const q = state.questions[state.index];
   answered = false;
   const myToken = ++playToken; // re-arm after stopAll() incremented it
@@ -183,6 +176,7 @@ el.replayChord.addEventListener("click", () => {
 });
 
 async function playFeedbackSequence(q, token) {
+  await engine.reset(); // fresh sampler — question-chord notes cannot bleed into feedback
   await sleep(SETTINGS.feedbackPauseSeconds * 1000);
   if (token !== feedbackToken) return;
   await engine.playBroken(q.notes, SETTINGS.brokenNoteSeconds);
