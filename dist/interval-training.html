@@ -64,23 +64,36 @@ button:not(:disabled):active { transform: translateY(1px); }
 
 .start-options {
   display: flex;
-  gap: 20px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 22px;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 36px;
 }
 .option-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 320px;
   color: var(--muted);
   font-size: 0.95rem;
 }
-.option-label select {
+.option-label select,
+.option-label input[type="number"] {
+  appearance: none;
+  -webkit-appearance: none;
   font: inherit;
-  margin-left: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
   border: 1px solid #3a3f6a;
   background: #2a2f57;
   color: var(--ink);
+  width: 200px;
+  text-align: center;
+  outline: none;
+}
+.option-label select:focus,
+.option-label input[type="number"]:focus {
+  border-color: var(--accent);
 }
 
 .choices {
@@ -134,12 +147,7 @@ button:not(:disabled):active { transform: translateY(1px); }
       <div class="start-options">
         <label class="option-label">
           Questions:
-          <select id="question-count">
-            <option value="5">5</option>
-            <option value="10" selected>10</option>
-            <option value="20">20</option>
-            <option value="30">30</option>
-          </select>
+          <input id="question-count" type="number" min="1" max="100" value="10" />
         </label>
         <label class="option-label">
           Sound:
@@ -694,7 +702,7 @@ document.getElementById("start-btn").addEventListener("click", async (e) => {
   await engine.resume(voiceSelect.value);
   startBtn.disabled = false;
   startBtn.textContent = "Start practice";
-  const n = parseInt(questionCountSelect.value, 10);
+  const n = Math.max(1, parseInt(questionCountSelect.value, 10) || 10);
   state.questions = pickItems(n);
   state.index = 0;
   state.answers = [];
@@ -824,16 +832,7 @@ function showSummary() {
 
   let html = `<p class="score">${right} / ${total}</p>`;
   html += `<p class="score-pct">${pct}% correct</p>`;
-
-  if (missed.length === 0) {
-    html += `<p class="perfect">Perfect score!</p>`;
-  } else {
-    html += `<h3>Missed</h3><ul>`;
-    for (const a of missed) {
-      html += `<li>${a.question.item.name} — you said ${a.chosen}, it had ${a.question.count}</li>`;
-    }
-    html += `</ul>`;
-  }
+  if (missed.length === 0) html += `<p class="perfect">Perfect score!</p>`;
   el.summaryBody.innerHTML = html;
   show("summary");
 }

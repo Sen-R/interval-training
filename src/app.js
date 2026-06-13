@@ -111,7 +111,7 @@ document.getElementById("start-btn").addEventListener("click", async (e) => {
   await engine.resume(voiceSelect.value);
   startBtn.disabled = false;
   startBtn.textContent = "Start practice";
-  const n = parseInt(questionCountSelect.value, 10);
+  const n = Math.max(1, parseInt(questionCountSelect.value, 10) || 10);
   state.questions = pickItems(n);
   state.index = 0;
   state.answers = [];
@@ -241,16 +241,7 @@ function showSummary() {
 
   let html = `<p class="score">${right} / ${total}</p>`;
   html += `<p class="score-pct">${pct}% correct</p>`;
-
-  if (missed.length === 0) {
-    html += `<p class="perfect">Perfect score!</p>`;
-  } else {
-    html += `<h3>Missed</h3><ul>`;
-    for (const a of missed) {
-      html += `<li>${a.question.item.name} — you said ${a.chosen}, it had ${a.question.count}</li>`;
-    }
-    html += `</ul>`;
-  }
+  if (missed.length === 0) html += `<p class="perfect">Perfect score!</p>`;
   el.summaryBody.innerHTML = html;
   show("summary");
 }
